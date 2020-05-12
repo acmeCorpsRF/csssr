@@ -1,3 +1,9 @@
+// Slomux — упрощённая, сломанная реализация Flux.
+// Перед вами небольшое приложение, написанное на React + Slomux.
+// Это нерабочий секундомер с настройкой интервала обновления.
+
+// Исправьте ошибки и потенциально проблемный код, почините приложение и прокомментируйте своё решение.
+
 // При нажатии на "старт" должен запускаться секундомер и через заданный интервал времени увеличивать свое значение
 // на значение интервала
 // При нажатии на "стоп" секундомер должен останавливаться и сбрасывать свое значение
@@ -26,19 +32,16 @@ const connect = (mapStateToProps, mapDispatchToProps) =>
         class WrappedComponent extends React.Component {
             render() {
                 return (
-                    <div className="WrappedComponent">
-                        <Component
-                            {...this.props}
-                            {...mapStateToProps(this.context.store.getState(), this.props)}
-                            {...mapDispatchToProps(this.context.store.dispatch, this.props)}
-                        />
-                    </div>
+                    <Component
+                        {...this.props}
+                        {...mapStateToProps(this.context.store.getState(), this.props)}
+                        {...mapDispatchToProps(this.context.store.dispatch, this.props)}
+                    />
                 )
             }
 
-            componentDidUpdate() {
-                console.log('componentDidUpdate WrappedComponent');
-                this.context.store.subscribe(this.handleChange)
+            componentDidMount() {
+                this.context.store.subscribe(this.handleChange) // Поставили подписку с первого монтажа.
             }
 
             handleChange = () => {
@@ -50,7 +53,7 @@ const connect = (mapStateToProps, mapDispatchToProps) =>
             store: PropTypes.object,
         };
 
-        return WrappedComponent
+        return WrappedComponent;
     };
 
 class Provider extends React.Component {
@@ -77,7 +80,7 @@ const CHANGE_INTERVAL = 'CHANGE_INTERVAL';
 // action creators
 const changeInterval = value => ({
     type: CHANGE_INTERVAL,
-    payload: value,
+    payload: value
 });
 
 
@@ -85,8 +88,6 @@ const changeInterval = value => ({
 const reducer = (state, action) => {
     switch (action.type) {
         case CHANGE_INTERVAL:
-            console.log(state);
-            console.log(action);
             return state += action.payload;
         default:
             return state;
@@ -94,16 +95,17 @@ const reducer = (state, action) => {
 };
 
 // components
-
-class IntervalComponent extends React.Component {
+class IntervalComponent extends React.PureComponent {
 
     render() {
-        console.log(this.props);
         return (
             <div>
                 <span>Интервал обновления секундомера: {this.props.currentInterval} сек.</span>
                 <span>
-                    <button onClick={() => this.props.changeInterval(-1)}>-</button>
+                    <button
+                        onClick={() => this.props.changeInterval(-1)}
+                        disabled={this.props.currentInterval === 0} // Отключаем кнопку, чтобы не уйти в минус.
+                    >-</button>
                     <button onClick={() => this.props.changeInterval(1)}>+</button>
                 </span>
             </div>
@@ -116,18 +118,21 @@ const Interval = connect(
         currentInterval: state,
     }),
     dispatch => ({
-        changeInterval: value => dispatch(changeInterval(value)), //////////// порядок перемнных.
+        changeInterval: value => dispatch(changeInterval(value)), // Порядок перемнных.
     })
 )(IntervalComponent);
 
 class TimerComponent extends React.Component {
     state = {
-        currentTime: 0
+        currentTime: 0,
+        buttonDisabled: false
     };
-
-    ///////////// bind функций
+    // Эта привязка обязательна для работы `this` в колбэке. Привязать к контексту.
+    // constructor() {
+    //     this.handleClick = this.handleClick.bind(this);
+    // }
+    // <button onClick={() => this.handleClick()}>
     render() {
-        console.log(this.props);
         return (
             <div>
                 <Interval/>
@@ -135,7 +140,11 @@ class TimerComponent extends React.Component {
                     Секундомер: {this.state.currentTime} сек.
                 </div>
                 <div>
-                    <button onClick={this.handleStart.bind(this)}>Старт</button>
+                    <button
+                        onClick={this.handleStart.bind(this)}
+                        disabled={this.state.buttonDisabled}
+                    >Старт
+                    </button>
                     <button onClick={this.handleStop.bind(this)}>Стоп</button>
                 </div>
             </div>
@@ -143,18 +152,31 @@ class TimerComponent extends React.Component {
     }
 
     handleStart() {
-        console.log(currentTime);
-        this.interval = setInterval(() => this.setState({
-            currentTime: this.state.currentTime + 1,
-        }), (this.props.currentInterval || 1) * 1000);
-        setTimeout(() => this.setState({
-            currentTime: this.state.currentTime + this.props.currentInterval,
-        }), this.props.currentInterval)
+        let counter = 0;
+        this.interval = setInterval(() => {
+            this.setState({
+                currentTime: this.state.currentTime + 1,
+                buttonDisabled: true // Отключаем кнопку, чтобы не запустить повторно таймер.
+            });
+            counter++;
+            if (counter === this.props.currentInterval) {
+                clearInterval(this.interval);
+                setTimeout(() => {
+                    this.setState({
+                        currentTime: this.state.currentTime + this.props.currentInterval
+                    });
+                    this.handleStart();
+                }, 1000);
+            }
+        }, 1000);
     }
 
     handleStop() {
         clearInterval(this.interval);
-        this.setState({currentTime: 0})
+        this.setState({
+            currentTime: 0,
+            buttonDisabled: false
+        })
     }
 }
 
